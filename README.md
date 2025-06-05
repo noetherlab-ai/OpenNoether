@@ -311,10 +311,36 @@ This tells the CPU: "Return to the address stored in x30"
 **Stack Pointer**  
 The stack is a special area of memory used to store temporary data like: function arguments, return addresses, local variables, saved register values. Think of it like a pile of plates, you always add or remove plates from the top.     
 The stack pointer (sp) is a special register that always holds the address of the top of the stack. In ARM64, the stack grows downward - meaning when you add things, the address gets smaller.    
+Let's say you're calling a function:
+- The CPU stores the return address on the stack
+- Local variables inside the function are also put on the stack
+- The stack pointer moves downward to make space    
 
+When the function ends, the local variables and return address are removed from the stack. **sp** moves upward to clean up. Example:
+```
+sub sp, sp, #16     // make space for two 64-bit values (2 * 8 bytes)
+str x0, [sp]        // store x0 at top of stack
+str x1, [sp, #8]    // store x1 next to it
+
+// later...
+ldr x0, [sp]        // restore x0
+ldr x1, [sp, #8]    // restore x1
+add sp, sp, #16     // clean up stack (pop)
+```
 
 **Zero Register**    
+The zero register is a special register in ARM64 called:    
+- xzr: for 64 bit operation
+- wzr: for 32 bit operation
 
+It always contains the value 0, and you cannot change it.     
+
+Example: 
+```
+mov x1, xzr
+```
+xzr is not a normal register - it always returns 0. You are copying 0 into x1. Internally, both the stack pointer (sp) and the zero register (xzr) use the same binary encoding 31.     
+But the CPU interprets 31 differently depending on the instruction. Some instructions treat register 31 as stack pointer, other treat it as zero register. 
 
 **Program Counter**    
 
