@@ -342,7 +342,39 @@ mov x1, xzr
 xzr is not a normal register - it always returns 0. You are copying 0 into x1. Internally, both the stack pointer (sp) and the zero register (xzr) use the same binary encoding 31.     
 But the CPU interprets 31 differently depending on the instruction. Some instructions treat register 31 as stack pointer, other treat it as zero register. 
 
-**Program Counter**    
+**Program Counter**      
+The program counter or pc is a special register in CPU that keeps track of where the program is in memory. It always contains the address of the next instruction the CPU will execute.     
+Instructions in memory are stored in order like:    
+```
+0x1000: add x0, x1, x2
+0x1004: sub x3, x4, x5
+0x1008: mov x6, x7
+```
+When the CPU runs it, it looks at the current pc value, fetches the instructions at 0x1000(add x0, x1, x2), executes it, increments the pc by 4(because ARM64 instructions are 4 bytes long) and repeats the process with the next instruction.    
+
+You can make the program jump to different parts of code using pc. You can put new address in pc, and the CPU will start executing from there. PC lets you:
+- Jump to another function
+- Skip over code
+- Repeat a loop
+- Handle conditions
+
+Example psudo-assembly
+```
+adr x0, label      // Get address of `label` into x0
+br  x0             // Jump to that address (set pc = x0)
+
+...
+
+label:
+  mov x1, #42      // Code starts here after the jump
+```
 
 
+### Instruction components    
+
+The AArch64 processor supports a relatively small set of instructions grouped into four basic instruction types. Many instructions have optional modifiers, which results in a very rich programming language.     
+- Data processing
+- Load/store
+- Branching 
+- System    
 
