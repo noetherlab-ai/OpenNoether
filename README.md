@@ -25,6 +25,7 @@ x2 - source1
 x3 - source2   
 
 ## Simple ARM64 Instructions
+
 put 10 in x0 - move immediate or register 
 ```
 mov x0, #10
@@ -233,6 +234,7 @@ Data In: Used to read data from memory/I/O into the CPU.
 External memory (RAM/ROM) and input/output devices that interact with CPU. They are connected via address and data buses.   
 
 #### Simple Instruction Cycle 
+
 ADD X0, X1, X2   ; X0 = X1 + X2   
 Program Counter (PC) contains the address of the next instruction in memory. This address is sent via Address Bus to Memory. The instruction (ADD X0, X1, X2) is returned from the memory via Data In line and loaded into instruction register.    
 The instruction register decodes the instruction and determines its an ADD operation with operand X1 and X2, result to be stored in X0. The control unit sends signals
@@ -250,7 +252,8 @@ holding temporary results of calculations. Registers R16-R29 can also be used as
 registers, but their contents must be saved before they are used, and restored to their original
 contents before the procedure exits.
 
-**Frame Pointer**    
+**Frame Pointer**  
+
 Frame pointer is a convention not a hardware rule. It is typically the register x29 in AArch64 (ARM64). It points to the base of current functions stack frame.    
 When a function is called, it might save return address, store parameters, and allocate local variables. If these are pushed onto the stack, we need a way to access them later. There are two options:
 - use sp(stack pointer), but it moves (not reliable)
@@ -264,7 +267,8 @@ gcc -fomit-frame-pointer
 ```
 Then the compiler won't use x29 as frame pointer    
 
-**PSTATE Register**     
+**PSTATE Register**    
+
 The PSTATE register(short for Processor State) is a special register in the ARM64 architechture that stores:    
 - The current status of the processor
 - The result of recent operations
@@ -291,7 +295,8 @@ The instruction b.eq means "branch if equal", chich depends on Z=1. This way you
 - if x == y -> do something
 - if x < y -> do something else     
 
-**Link Register**    
+**Link Register**   
+
 Link register x30 is a special purpose register. When your program calls a function (or subroutine), it needs to remember where to return after the function finishes. x30 is used to store the return address, i.e., the address where the program should come back after the function ends.    
 
 Instructions like
@@ -309,6 +314,7 @@ This tells the CPU: "Return to the address stored in x30"
 
 
 **Stack Pointer**  
+
 The stack is a special area of memory used to store temporary data like: function arguments, return addresses, local variables, saved register values. Think of it like a pile of plates, you always add or remove plates from the top.     
 The stack pointer (sp) is a special register that always holds the address of the top of the stack. In ARM64, the stack grows downward - meaning when you add things, the address gets smaller.    
 Let's say you're calling a function:
@@ -328,7 +334,8 @@ ldr x1, [sp, #8]    // restore x1
 add sp, sp, #16     // clean up stack (pop)
 ```
 
-**Zero Register**    
+**Zero Register**  
+
 The zero register is a special register in ARM64 called:    
 - xzr: for 64 bit operation
 - wzr: for 32 bit operation
@@ -342,7 +349,8 @@ mov x1, xzr
 xzr is not a normal register - it always returns 0. You are copying 0 into x1. Internally, both the stack pointer (sp) and the zero register (xzr) use the same binary encoding 31.     
 But the CPU interprets 31 differently depending on the instruction. Some instructions treat register 31 as stack pointer, other treat it as zero register. 
 
-**Program Counter**      
+**Program Counter**  
+
 The program counter or pc is a special register in CPU that keeps track of where the program is in memory. It always contains the address of the next instruction the CPU will execute.     
 Instructions in memory are stored in order like:    
 ```
@@ -377,4 +385,69 @@ The AArch64 processor supports a relatively small set of instructions grouped in
 - Load/store
 - Branching 
 - System    
+
+#### Setting and using condition flags
+
+PSTATE is a special CPU register that contains status flags. Normal instructions don't affect flags:
+```
+add x0, x1, x2
+```
+This adds x1 + x2, and stores it in x0 but does not change any flags in PSTATE.
+```
+adds x0, x1, x2
+```
+Instruction with s suffix do affect flags. 
+
+**Why set flags?**  
+
+Because you can use them for conditional execution, like branching:
+```
+adds x0, x1, x2 // set flag based on result
+
+beq label // branch (jump) if result was zero (Z = 1)
+```
+
+The basic unconditional branch: 
+```
+b label // always jump
+```
+But you can add conditional codes: eq, ne, lt, gt, ge, le, cs, mi
+```
+b.eq label   // branch if zero
+b.ne label   // branch if NOT zero
+b.lt label   // branch if less than (signed)
+```
+
+#### Immediate values
+
+An immediate value is just a constant number you put directly into an instruction. 
+```
+mov x0, #5      // Move the number 5 directly into register x0
+add x1, x1, #1  // Add 1 to x1
+```
+(#5 ,#1) - these are immediate values. There are two ways to use immediate values in GNU ARM64 assembly:
+
+**Direct/Literal Immediate**     
+You write directly with a # sign (the # is optional but helps readability)
+```
+mov x0, #42         // decimal
+mov x1, #0xFF       // hexadecimal
+mov x2, #0b1010     // binary
+```
+The assembler tries to encode this number directly inside the machine instruction.     
+But there is a limit. Not all numbers can be encoded directly. For example, arithmetic instructions like add, mov, etc., usually only support 12-bit immediate values (0–4095 or a special pattern). If the value is too big (like #10000000000), this will fail. The assembler will give an error. To fix this, you need to use the second method:
+
+**```ldr xN, =<immediate>``` Pseudo-instruction**     
+This tells the assembler: "Put this value somewhere in memory and load it into register."     
+```
+ldr x0, =0xFFFFFFFFFFFFFFFF    // Load full 64-bit value
+ldr x1, =main                  // Load address of symbol "main"
+```
+This is called a pseudo-instruction because there’s no actual LDR instruction like this in machine code. Instead, the assembler turns it into real instructions + data in memory.    
+Behind the scenes, the assembler will:
+- Put the value into a literal pool (a small area in memory),
+- Generate code to load the value from memory into your register.
+
+You can write number in several formats: decimal(#123), hex(#0x7B), binary(#0b1111011), and octal(#0173).
+
 
