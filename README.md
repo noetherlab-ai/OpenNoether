@@ -89,7 +89,8 @@ free(p);
 ```   
 
 
-**Stack (Function Calls, Local Variables)**   
+**Stack (Function Calls, Local Variables)** 
+
 When a function is called arguments are pushed into stack. The return address is saved. Local variables are allocated on the stack. The frame pointer (fp/x29) is updated.
 
 Grows downward (toward lower memory)   
@@ -226,11 +227,13 @@ The result from ALU is sent back to **General Purpose Registers** or to other un
 Program counter are points to next instruction in memory. Gets updated after each instruction fetch (unless a branch or jump modifies it).    
 Address register holds the memory address for data access (load/store). The value in this register is placed on the Address Bus. Address Bus carries the memory address from the CPU to the Memory and I/O Devices.    
 
-**Data In / Data Out**    
+**Data In / Data Out**  
+
 Data Out: Used to write data from the CPU to memory/I/O.   
 Data In: Used to read data from memory/I/O into the CPU.
 
-**Memory and I/O Devices**   
+**Memory and I/O Devices**  
+
 External memory (RAM/ROM) and input/output devices that interact with CPU. They are connected via address and data buses.   
 
 #### Simple Instruction Cycle 
@@ -427,7 +430,8 @@ add x1, x1, #1  // Add 1 to x1
 ```
 (#5 ,#1) - these are immediate values. There are two ways to use immediate values in GNU ARM64 assembly:
 
-**Direct/Literal Immediate**     
+**Direct/Literal Immediate**  
+
 You write directly with a # sign (the # is optional but helps readability)
 ```
 mov x0, #42         // decimal
@@ -437,7 +441,8 @@ mov x2, #0b1010     // binary
 The assembler tries to encode this number directly inside the machine instruction.     
 But there is a limit. Not all numbers can be encoded directly. For example, arithmetic instructions like add, mov, etc., usually only support 12-bit immediate values (0–4095 or a special pattern). If the value is too big (like #10000000000), this will fail. The assembler will give an error. To fix this, you need to use the second method:
 
-**```ldr xN, =<immediate>``` Pseudo-instruction**     
+**```ldr xN, =<immediate>``` Pseudo-instruction**  
+
 This tells the assembler: "Put this value somewhere in memory and load it into register."     
 ```
 ldr x0, =0xFFFFFFFFFFFFFFFF    // Load full 64-bit value
@@ -450,4 +455,147 @@ Behind the scenes, the assembler will:
 
 You can write number in several formats: decimal(#123), hex(#0x7B), binary(#0b1111011), and octal(#0173).
 
+
+#### Addressing modes    
+AArch64 is a load-store architecture. This means instructions that do calculation (add, multiply), only work with registers, not directly from memory. To use data from memory, you must first load it into register. After you're done with a value, you can store it back into memory.     
+
+Example Workflow:
+```
+ldr x0, [mem1]      // Load value at mem1 into register x0
+ldr x1, [mem2]      // Load value at mem2 into register x1
+add x2, x0, x1      // Add x0 and x1, store result in x2
+str x2, [result]    // Store x2 back into memory
+```
+You can transfer different sizes of data. Byte - 8 bits(ldrb, strb), halfword - 16 bits(ldrh, strh), word - 32 bits(ldr, str) - for w registers like w0, doubleword - 64 bits(ldr, str) - for x registers like x0.
+
+**Computational Instructions**    
+```
+add x2, x0, x1      // x2 = x0 + x1
+sub x3, x2, #10     // x3 = x2 - 10
+```
+These instructinos only use registers not memory.
+
+**Addressing modes in Load/Store instructions**    
+
+When using ldr or str, you need to tell the CPU where in memory to read from or write to. There are 3 main types of addressing modes (and a couple of extras).    
+
+1. Register Offset: 
+```
+ldr x0, [x1, x2]    // address = x1 + x2
+```
+
+2. Immediate Offset:
+```
+ldr x0, [x1, #16]   // address = x1 + 16
+// x1 does not change here
+```
+
+3. Pre-indexed:
+```
+ldr x0, [x1, #8]!   // x1 = x1 + 8, then load from [x1]
+// x1 is updated first, then loaded 
+```
+
+4. Post-indexed:
+```
+ldr x0, [x1], #8    // load from [x1], then x1 = x1 + 8
+// x1 is loaded first then updated
+```
+
+5. Literal Addressing:
+```
+ldr x0, =label      // Load the address of `label` into x0 (pseudo-instruction)
+```
+
+6. Pseudo Addressing (using =)
+```
+ldr x0, =0xABCDEF   // load a full 64-bit constant into x0
+ldr x1, =myVar      // load the address of variable `myVar`
+```
+
+#### Load and store instructions
+
+When you are working in AArch64 assembly (ARM64 bit), the ldr and str instructions are used to move data between memory and registers. There are three main types based on how much and what kind of data is being moved: 
+
+**Single Register Load/Store**  
+
+Moves one value between memory and a register. Load and  store example:    
+```
+ldr x0, [x1]     // Load 64-bit value from memory at x1 into x0
+str x0, [x1]     // Store 64-bit value from x0 into memory at x1
+```
+It can be for 8 bit (ldrb, strb), 16 bit (ldrh, strh), 32 bit (ldr, str)w, 64 bit (ldr, str)x.
+
+**Register Pair Load/Store**    
+
+Moves two registers at once (a pair), which is more efficient for saving/restoring context (like function calls). Load and store example:
+```
+stp x0, x1, [sp, #-16]!  // Store x0 and x1 on the stack
+ldp x0, x1, [sp], #16    // Load x0 and x1 from stack, then update sp
+```
+
+Often used for saving/returning function arguments or return values and stack frame management.    
+
+**Atomic Load/Store**     
+
+Provides atomic (thread safe) memory operations - meaning the operations cannot be interrupted, which is crucial for multithreaded programs. Load and store example:
+```
+ldxr x0, [x1]     // Load x0 from x1 atomically
+stxr w2, x3, [x1] // Attempt atomic store of x3 into [x1]
+```
+Often used for implementing locks, semaphores or concurrent algorithm. Preventing race conditions in multi-core systems.   
+
+An atomic operation means, "It happens completely or not at all, and cannot be interrupted."     
+
+This is critical in multi-threading where multiple cores or threads might access the same memory. 
+
+
+#### Branch Instructions
+
+In assembly, a branch is just a way to jump to a different instruction instead of going to the next one in order. Branching lets us build:    
+- Loops (while, for)
+- If/Else logic
+- Function calls and returns     
+
+There are five main branch instructions in AArch64:    
+
+**Branch (unconditional): b**  
+
+This jumps unconditionally to a label or address.
+```
+b loop_start   // Always jump to label 'loop_start'
+```
+Use when you want to create infinite loops or are finished with a block and want to skip to another part.    
+
+**Branch to Register: br**    
+
+This jumps to an addressed stored in a register. 
+```
+mov x30, lr        // Return address is in link register
+br x30             // Jump to address in x30
+```
+Use when returning from a function (br x30) or jumping to a computed address
+
+**Branch and link: bl**    
+
+This is for function calls. It saves the return address in link register (x30), so the function knows where to return.
+```
+bl my_function    // Jump to 'my_function' and save return address in x30
+```
+Use when calling a subroutine or need to return back after the function. To return:
+```
+ret             // Equivalent to: br x30
+```
+
+**Compare and branch: cbz and cbnz**    
+
+These are conditional branches based on a register value. 
+```
+cbz x0, is_zero     // If x0 == 0, jump to 'is_zero'
+cbnz x1, loop_again // If x1 != 0, jump to 'loop_again'
+```
+
+
+
+## Data Processing and other instructions
 
